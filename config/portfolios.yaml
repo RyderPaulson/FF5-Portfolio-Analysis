@@ -1,0 +1,51 @@
+rf: 0.045
+n_simulations: 10000
+horizon_years: 44
+milestones:
+  - name: House
+    year: 10
+  - name: Retire
+    year: 44
+milestone_targets:
+  - 3.0
+  - 10.0
+
+portfolios:
+  - title: Current
+    assets: [MSFT, DE, BP, BRK.B, VOO, QQQ, VXUS]
+    weights: [0.1568, 0.1481, 0.1012, 0.06539, 0.1341, 0.04011, 0.0801]
+
+  - title: VOO
+    assets: [VOO]
+    weights: [1.0]
+    rebalance_cost: 0.06
+
+  - title: VT
+    assets: [VT]
+    weights: [1.0]
+    rebalance_cost: 0.06
+
+  - title: US+Intl
+    assets: [VOO, QQQ, VXUS, AAAU]
+    weights: [0.4, 0.2, 0.3, 0.1]
+    rebalance_cost: 0.06
+
+  - title: AVGE
+    assets: [AVGE]
+    weights: [1.0]
+    rebalance_cost: 0.06
+
+  - title: DFAW
+    assets: [DFAW]
+    weights: [1.0]
+    rebalance_cost: 0.06
+
+  - title: 5F+4GF
+    assets: [AVGE, VUG, VOT, VBK]
+    weights: [0.8, 0.07, 0.07, 0.06]
+    rebalance_cost: 0.06
+
+  - title: AVGE+OP
+    assets: [AVGE, MSFT, DE, BP, BRK.B, VOO, QQQ, VXUS]
+    weights: [0.9, 0.01568, 0.01481, 0.01012, 0.006539, 0.01341, 0.004011, 0.00801]
+    rebalance_cost: 0.06
