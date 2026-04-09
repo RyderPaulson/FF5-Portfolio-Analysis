@@ -1,0 +1,21 @@
+# Credentials — never commit API keys
+alpaca_keys.mat
+
+# MATLAB generated / compiled artifacts
+*.mexw64
+*.mexw32
+*.mexa64
+codegen/
+
+# Cache — regenerated automatically at runtime
+cache/
+
+# Generated outputs
+portfolio_analytics.csv
+
+# MATLAB autosave and temp files
+*.asv
+*.m~
+
+# Claude Code internal files
+.claude/
