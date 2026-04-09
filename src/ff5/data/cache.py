@@ -51,16 +51,18 @@ def save_bars(symbol: str, df: pd.DataFrame):
 
 
 def load_or_fetch_bars(
-    symbols: list[str], alpaca_client, start_date: str = "2000-01-01"
+    symbols: list[str], alpaca_client=None, start_date: str = "2000-01-01"
 ) -> pd.DataFrame:
-    """Load bars from cache or fetch from Alpaca, returning synchronized close prices.
+    """Load bars from cache or fetch via yfinance (or Alpaca fallback).
 
     Returns a DataFrame with DatetimeIndex and one column per symbol.
     """
     missing = [s for s in symbols if get_cached_bars(s) is None]
 
     if missing:
-        bar_data = alpaca_client.get_bars(missing, "1Day", start_date)
+        from ff5.data.yfinance_loader import fetch_yfinance_bars
+
+        bar_data = fetch_yfinance_bars(missing, start=start_date)
         for sym in missing:
             if sym in bar_data:
                 save_bars(sym, bar_data[sym])

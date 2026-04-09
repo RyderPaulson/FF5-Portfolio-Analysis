@@ -85,6 +85,7 @@ class ForecastedReturns:
     pct50: np.ndarray
     pct75: np.ndarray
     pct95: np.ndarray
+    sample_paths: np.ndarray | None = None  # (total_days, n_samples) subset of MC paths
 
 
 @dataclass

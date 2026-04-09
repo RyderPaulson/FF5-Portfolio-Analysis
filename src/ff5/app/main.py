@@ -108,7 +108,16 @@ def _create_layout() -> dbc.Container:
                                                 label="Efficient Frontier",
                                             ),
                                             dbc.Tab(
-                                                dcc.Graph(id="graph-forecast"),
+                                                html.Div([
+                                                    dbc.Select(
+                                                        id="forecast-portfolio-select",
+                                                        options=[],
+                                                        value=None,
+                                                        className="mb-2",
+                                                        style={"maxWidth": "300px"},
+                                                    ),
+                                                    dcc.Graph(id="graph-forecast"),
+                                                ]),
                                                 label="Forecasted Returns",
                                             ),
                                             dbc.Tab(
@@ -375,6 +384,8 @@ def _register_callbacks(app: dash.Dash):
         Output("graph-distributions", "figure"),
         Output("graph-factors", "figure"),
         Output("graph-drawdown", "figure"),
+        Output("forecast-portfolio-select", "options"),
+        Output("forecast-portfolio-select", "value"),
         Input("store-results-version", "data"),
     )
     def update_visualizations(_version):
@@ -389,6 +400,8 @@ def _register_callbacks(app: dash.Dash):
                 empty_fig,
                 empty_fig,
                 empty_fig,
+                [],
+                None,
             )
 
         results_map = {title: r for title, r in pairs}
@@ -404,12 +417,27 @@ def _register_callbacks(app: dash.Dash):
         except Exception:
             frontier = empty_fig
 
-        forecast = create_forecasted_returns(pairs, state.milestones)
+        first_title = pairs[0][0] if pairs else None
+        forecast = create_forecasted_returns(pairs, state.milestones, selected_title=first_title)
         distributions = create_return_distributions(pairs, state.milestones)
         factors = create_factor_exposures(pairs)
         drawdown = create_historical_drawdown(pairs)
 
-        return summary, frontier, forecast, distributions, factors, drawdown
+        forecast_options = [{"label": title, "value": title} for title, _ in pairs]
+
+        return summary, frontier, forecast, distributions, factors, drawdown, forecast_options, first_title
+
+    @callback(
+        Output("graph-forecast", "figure", allow_duplicate=True),
+        Input("forecast-portfolio-select", "value"),
+        State("store-results-version", "data"),
+        prevent_initial_call=True,
+    )
+    def update_forecast_selection(selected_title, _version):
+        pairs = state.get_analyzed_pairs()
+        if not pairs:
+            return no_update
+        return create_forecasted_returns(pairs, state.milestones, selected_title=selected_title)
 
     # ------------------------------------------------------------------ #
     # Config save/load

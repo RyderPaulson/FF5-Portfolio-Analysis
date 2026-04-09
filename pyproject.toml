@@ -17,6 +17,7 @@ dependencies = [
     "pyyaml>=6.0",
     "python-dotenv>=1.0",
     "diskcache>=5.6",
+    "yfinance>=0.2.36",
 ]
 
 [project.optional-dependencies]

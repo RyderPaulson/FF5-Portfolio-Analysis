@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time
 from collections import deque
+from datetime import date, timedelta
 
 import httpx
 import pandas as pd
@@ -18,6 +19,7 @@ class AlpacaClient:
         self._key_id = key_id
         self._secret_key = secret_key
         self._rate_limit = rate_limit
+        self._base_url = self.BASE_URL
         self._request_times: deque[float] = deque()
         self._client = httpx.Client(
             headers={
@@ -43,6 +45,7 @@ class AlpacaClient:
         start: str = "2000-01-01",
         end: str | None = None,
         adjustment: str = "split",
+        feed: str = "sip",
     ) -> dict[str, pd.DataFrame]:
         """Fetch historical OHLCV bars for one or more symbols.
 
@@ -50,7 +53,9 @@ class AlpacaClient:
         Open, High, Low, Close, Volume, TradeCount, VWAP
         """
         if end is None:
-            end = pd.Timestamp.now(tz="UTC").strftime("%Y-%m-%d")
+            # Use the prior trading day to ensure SIP data is available on
+            # free plans (SIP requires end to not include the current day)
+            end = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
 
         params = {
             "symbols": ",".join(symbols),
@@ -58,6 +63,7 @@ class AlpacaClient:
             "start": start,
             "end": end,
             "limit": "10000",
+            "feed": feed,
         }
         if adjustment:
             params["adjustment"] = adjustment
@@ -84,7 +90,7 @@ class AlpacaClient:
 
     def _request(self, endpoint: str, params: dict) -> dict:
         self._throttle()
-        url = self.BASE_URL + endpoint
+        url = self._base_url + endpoint
 
         max_retries = 3
         for attempt in range(max_retries):

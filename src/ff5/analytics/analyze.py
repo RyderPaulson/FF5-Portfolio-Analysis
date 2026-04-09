@@ -9,8 +9,6 @@ from ff5.analytics.covariance import ledoit_wolf_shrink
 from ff5.analytics.garch import fit_garch, garch_simulate
 from ff5.analytics.regression import ff5_regression
 from ff5.analytics.risk_metrics import compute_milestone_stats, compute_risk_metrics
-from ff5.config import get_alpaca_keys
-from ff5.data.alpaca import AlpacaClient
 from ff5.data.cache import (
     get_cached_results,
     load_or_fetch_bars,
@@ -74,9 +72,7 @@ def analyze_portfolio(
             return cached
 
     # Data Download (Level-1 cache via load_or_fetch_bars)
-    key_id, secret_key = get_alpaca_keys()
-    with AlpacaClient(key_id, secret_key) as client:
-        prices = load_or_fetch_bars(symbols, client)
+    prices = load_or_fetch_bars(symbols)
 
     # Compute returns
     returns = prices.pct_change().dropna()
@@ -176,6 +172,11 @@ def analyze_portfolio(
     pct75 = np.percentile(paths, 75, axis=1)
     pct95 = np.percentile(paths, 95, axis=1)
 
+    # Save a small sample of MC paths for visualization
+    n_sample = min(10, n_simulations)
+    sample_idx = rng.choice(n_simulations, size=n_sample, replace=False)
+    sample_paths = paths[:, sample_idx]
+
     # Historical risk metrics
     port_hist_returns = asset_ret_sync @ weights
     metrics = compute_risk_metrics(
@@ -236,6 +237,7 @@ def analyze_portfolio(
             pct5=pct5,
             pct25=pct25,
             pct50=pct50,
+            sample_paths=sample_paths,
             pct75=pct75,
             pct95=pct95,
         ),

@@ -21,6 +21,10 @@ def ledoit_wolf_shrink(X: np.ndarray) -> tuple[np.ndarray, float]:
     X = X - X.mean(axis=0)  # demean
     S = (X.T @ X) / T  # sample covariance
 
+    # Single asset: shrinkage is meaningless, just return the sample variance
+    if N == 1:
+        return S, 0.0
+
     # Constant-correlation target
     s_vec = np.sqrt(np.diag(S))  # asset std devs
     R = S / np.outer(s_vec, s_vec)  # sample correlation matrix
@@ -35,7 +39,7 @@ def ledoit_wolf_shrink(X: np.ndarray) -> tuple[np.ndarray, float]:
 
     # rho: asymptotic covariance with the target
     theta_mat = ((X**3).T @ X) / T - np.diag(np.diag(S)) @ R
-    rho_off_diag = (r_bar * np.outer(s_vec / s_vec[:, None].ravel(), np.ones(N)) * theta_mat).sum()
+    rho_off_diag = (r_bar * (s_vec[:, None] / s_vec[None, :]) * theta_mat).sum()
     rho_sum = np.diag(pi_mat).sum() + rho_off_diag
 
     # gamma: squared Frobenius distance
