@@ -1,6 +1,5 @@
 # Credentials
 .env
-alpaca_keys.mat
 
 # Cache — regenerated at runtime
 cache/

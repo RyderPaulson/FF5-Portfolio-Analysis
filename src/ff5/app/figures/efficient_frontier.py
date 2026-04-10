@@ -155,7 +155,7 @@ def create_efficient_frontier(
                 y=frontier_ret_pct.tolist(),
                 mode="lines",
                 name="Efficient Frontier",
-                line=dict(color="#999999", width=2),
+                line=dict(color="#8A8473", width=2),
             )
         )
 
@@ -172,7 +172,7 @@ def create_efficient_frontier(
                 y=cml_y,
                 mode="lines",
                 name="Capital Market Line",
-                line=dict(color="#2196F3", width=2, dash="dash"),
+                line=dict(color="#5A8EAE", width=2, dash="dash"),
             )
         )
 

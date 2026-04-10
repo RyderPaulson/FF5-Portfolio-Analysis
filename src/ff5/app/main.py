@@ -6,7 +6,7 @@ import traceback
 
 import dash
 import dash_bootstrap_components as dbc
-from dash import Input, Output, State, callback, ctx, dcc, html, no_update
+from dash import ALL, Input, Output, State, callback, ctx, dcc, html, no_update
 
 from ff5.analytics.analyze import analyze_portfolio
 from ff5.app.components.analysis_controls import create_run_button, create_settings_panel
@@ -19,23 +19,50 @@ from ff5.app.figures.efficient_frontier import create_efficient_frontier
 from ff5.app.figures.factor_exposures import create_factor_exposures
 from ff5.app.figures.forecasted_returns import create_forecasted_returns
 from ff5.app.figures.historical_drawdown import create_historical_drawdown
-from ff5.app.figures.return_distributions import create_return_distributions
+from ff5.app.figures.return_distributions import create_return_distribution_single
 from ff5.app.state import state
+from ff5.app.theme import (
+    BG_CARD,
+    BG_PAGE,
+    BG_SIDEBAR,
+    BENTO_CARD_STYLE,
+    BENTO_CARD_STYLE_COMPACT,
+    COLOR_BORDER,
+    COLOR_PRIMARY,
+    COLOR_PRIMARY_DARK,
+    COLOR_TEXT,
+    COLOR_TEXT_MUTED,
+    FONT_FAMILY,
+)
 from ff5.models import Milestone, OptimOptions, PortfolioSpec
 from ff5.optimizers.dispatcher import run_optimizer
+
+
+# Shared graph config — smaller margins for bento cards
+_GRAPH_STYLE = {"height": "340px"}
+_GRAPH_CONFIG = {"displayModeBar": False}
+
+
+def _bento(children, **style_overrides):
+    """Wrap children in a bento card div."""
+    s = {**BENTO_CARD_STYLE, **style_overrides}
+    return html.Div(children, style=s)
+
+
+def _bento_compact(children, **style_overrides):
+    s = {**BENTO_CARD_STYLE_COMPACT, **style_overrides}
+    return html.Div(children, style=s)
 
 
 def create_app() -> dash.Dash:
     """Create and configure the Dash application."""
     app = dash.Dash(
         __name__,
-        external_stylesheets=[dbc.themes.FLATLY],
+        external_stylesheets=[dbc.themes.BOOTSTRAP],
         suppress_callback_exceptions=True,
     )
 
     app.title = "FF5 Portfolio Analysis"
-
-    # Load saved config
     state.load_from_yaml()
 
     app.layout = _create_layout()
@@ -44,113 +71,153 @@ def create_app() -> dash.Dash:
     return app
 
 
-def _create_layout() -> dbc.Container:
-    return dbc.Container(
-        [
-            # Header
-            dbc.Navbar(
-                dbc.Container(
-                    [
-                        dbc.NavbarBrand(
-                            "FF5 Portfolio Analysis",
-                            className="fw-bold",
-                        ),
-                        create_run_button(),
-                    ],
-                    fluid=True,
-                    className="d-flex align-items-center",
-                ),
-                color="dark",
-                dark=True,
-                className="mb-3",
-            ),
-            # Main content
-            dbc.Row(
-                [
-                    # Sidebar
-                    dbc.Col(
-                        html.Div(
-                            [
-                                create_portfolio_editor_layout(),
-                                create_settings_panel(),
-                            ],
-                            className="p-3",
-                            style={
-                                "height": "calc(100vh - 80px)",
-                                "overflowY": "auto",
-                            },
-                        ),
-                        width=3,
-                        className="bg-light border-end",
+def _create_layout() -> html.Div:
+    return html.Div(
+        style={
+            "backgroundColor": BG_PAGE,
+            "minHeight": "100vh",
+            "fontFamily": FONT_FAMILY,
+            "color": COLOR_TEXT,
+        },
+        children=[
+            # ── Header bar ──────────────────────────────────────────────
+            html.Div(
+                style={
+                    "padding": "16px 24px",
+                    "display": "flex",
+                    "alignItems": "center",
+                    "justifyContent": "space-between",
+                },
+                children=[
+                    html.H4(
+                        "FF5 Portfolio Analysis",
+                        style={
+                            "margin": 0,
+                            "fontWeight": "600",
+                            "color": COLOR_TEXT,
+                            "letterSpacing": "-0.02em",
+                        },
                     ),
-                    # Main content area
-                    dbc.Col(
-                        [
-                            # Status/loading
+                    html.Div(
+                        style={"display": "flex", "gap": "8px", "alignItems": "center"},
+                        children=[
                             dbc.Alert(
                                 id="status-alert",
                                 is_open=False,
                                 duration=5000,
-                                className="mb-2",
+                                style={"margin": 0, "padding": "6px 12px", "fontSize": "13px"},
                             ),
-                            dcc.Loading(
-                                id="loading-indicator",
-                                type="default",
+                            create_run_button(),
+                        ],
+                    ),
+                ],
+            ),
+
+            # ── Bento grid ─────────────────────────────────────────────
+            html.Div(
+                style={
+                    "display": "grid",
+                    "gridTemplateColumns": "280px 1fr 1fr",
+                    "gap": "12px",
+                    "padding": "0 24px 24px 24px",
+                },
+                children=[
+                    # ── Sidebar: portfolio editor (flows with page) ─────
+                    html.Div(
+                        style={
+                            **BENTO_CARD_STYLE,
+                            "backgroundColor": BG_SIDEBAR,
+                            "gridRow": "1 / 6",
+                        },
+                        children=[
+                            create_portfolio_editor_layout(),
+                            html.Hr(style={"borderColor": COLOR_BORDER, "margin": "16px 0"}),
+                            create_settings_panel(),
+                        ],
+                    ),
+
+                    # ── Row 1: Summary table ────────────────────────────
+                    html.Div(
+                        style={
+                            **BENTO_CARD_STYLE,
+                            "gridColumn": "2 / 4",
+                        },
+                        children=[
+                            html.H6("Summary", style={"marginBottom": "12px", "color": COLOR_TEXT_MUTED}),
+                            html.Div(id="tab-summary"),
+                        ],
+                    ),
+
+                    # ── Row 2: Efficient Frontier + Forecasted Returns ──
+                    _bento_compact(
+                        [
+                            html.H6("Efficient Frontier", style={"marginBottom": "8px", "color": COLOR_TEXT_MUTED}),
+                            dcc.Graph(id="graph-frontier", style=_GRAPH_STYLE, config=_GRAPH_CONFIG),
+                        ],
+                    ),
+                    _bento_compact(
+                        [
+                            html.Div(
+                                style={"display": "flex", "justifyContent": "space-between", "alignItems": "center", "marginBottom": "8px"},
                                 children=[
-                                    dbc.Tabs(
-                                        [
-                                            dbc.Tab(
-                                                html.Div(id="tab-summary"),
-                                                label="Summary",
-                                            ),
-                                            dbc.Tab(
-                                                dcc.Graph(id="graph-frontier"),
-                                                label="Efficient Frontier",
-                                            ),
-                                            dbc.Tab(
-                                                html.Div([
-                                                    dbc.Select(
-                                                        id="forecast-portfolio-select",
-                                                        options=[],
-                                                        value=None,
-                                                        className="mb-2",
-                                                        style={"maxWidth": "300px"},
-                                                    ),
-                                                    dcc.Graph(id="graph-forecast"),
-                                                ]),
-                                                label="Forecasted Returns",
-                                            ),
-                                            dbc.Tab(
-                                                dcc.Graph(id="graph-distributions"),
-                                                label="Distributions",
-                                            ),
-                                            dbc.Tab(
-                                                dcc.Graph(id="graph-factors"),
-                                                label="Factor Exposures",
-                                            ),
-                                            dbc.Tab(
-                                                dcc.Graph(id="graph-drawdown"),
-                                                label="Drawdown",
-                                            ),
-                                        ],
-                                        id="main-tabs",
-                                        active_tab="tab-0",
+                                    html.H6("Forecasted Returns", style={"margin": 0, "color": COLOR_TEXT_MUTED}),
+                                    dbc.Select(
+                                        id="forecast-portfolio-select",
+                                        options=[],
+                                        value=None,
+                                        style={"maxWidth": "160px", "fontSize": "12px", "padding": "2px 8px"},
                                     ),
                                 ],
                             ),
+                            dcc.Graph(id="graph-forecast", style=_GRAPH_STYLE, config=_GRAPH_CONFIG),
                         ],
-                        width=9,
-                        className="p-3",
+                    ),
+
+                    # ── Row 3: House Distribution + Retire Distribution ─
+                    _bento_compact(
+                        [
+                            html.H6("House Distribution", style={"marginBottom": "8px", "color": COLOR_TEXT_MUTED}),
+                            dcc.Graph(id="graph-dist-house", style=_GRAPH_STYLE, config=_GRAPH_CONFIG),
+                        ],
+                    ),
+                    _bento_compact(
+                        [
+                            html.H6("Retirement Distribution", style={"marginBottom": "8px", "color": COLOR_TEXT_MUTED}),
+                            dcc.Graph(id="graph-dist-retire", style=_GRAPH_STYLE, config=_GRAPH_CONFIG),
+                        ],
+                    ),
+
+                    # ── Row 4: Drawdown + Factor Exposures ──────────────
+                    _bento_compact(
+                        [
+                            html.Div(
+                                style={"display": "flex", "justifyContent": "space-between", "alignItems": "center", "marginBottom": "8px"},
+                                children=[
+                                    html.H6("Historical Drawdown", style={"margin": 0, "color": COLOR_TEXT_MUTED}),
+                                    dbc.Select(
+                                        id="drawdown-portfolio-select",
+                                        options=[],
+                                        value=None,
+                                        style={"maxWidth": "160px", "fontSize": "12px", "padding": "2px 8px"},
+                                    ),
+                                ],
+                            ),
+                            dcc.Graph(id="graph-drawdown", style=_GRAPH_STYLE, config=_GRAPH_CONFIG),
+                        ],
+                    ),
+                    _bento_compact(
+                        [
+                            html.H6("Factor Exposures", style={"marginBottom": "8px", "color": COLOR_TEXT_MUTED}),
+                            dcc.Graph(id="graph-factors", style=_GRAPH_STYLE, config=_GRAPH_CONFIG),
+                        ],
                     ),
                 ],
-                className="g-0",
             ),
-            # Hidden stores for state synchronization
+
+            # Hidden stores
             dcc.Store(id="store-portfolios-version", data=0),
             dcc.Store(id="store-results-version", data=0),
         ],
-        fluid=True,
-        className="p-0",
     )
 
 
@@ -165,11 +232,11 @@ def _register_callbacks(app: dash.Dash):
         Output("store-portfolios-version", "data"),
         Input("btn-add-portfolio", "n_clicks"),
         Input("btn-remove-portfolio", "n_clicks"),
+        Input("store-portfolios-version", "data"),
         State("portfolio-selector", "value"),
-        State("store-portfolios-version", "data"),
         prevent_initial_call=False,
     )
-    def manage_portfolios(add_clicks, remove_clicks, selected, version):
+    def manage_portfolios(add_clicks, remove_clicks, version, selected):
         triggered = ctx.triggered_id
 
         if triggered == "btn-add-portfolio":
@@ -264,9 +331,80 @@ def _register_callbacks(app: dash.Dash):
         if ticker and ticker not in p.assets:
             p.assets.append(ticker)
             p.weights.append(0.0)
-            # Re-normalize: give new ticker equal share
             n = len(p.weights)
             p.weights = [1.0 / n] * n
+            return (version or 0) + 1
+        return no_update
+
+    # ------------------------------------------------------------------ #
+    # Remove Ticker
+    # ------------------------------------------------------------------ #
+
+    @callback(
+        Output("store-portfolios-version", "data", allow_duplicate=True),
+        Input({"type": "btn-remove-ticker", "index": ALL}, "n_clicks"),
+        State("portfolio-selector", "value"),
+        State("store-portfolios-version", "data"),
+        prevent_initial_call=True,
+    )
+    def remove_ticker(n_clicks_list, selected, version):
+        if selected is None or not any(n_clicks_list):
+            return no_update
+        idx = int(selected)
+        if idx >= len(state.portfolios):
+            return no_update
+
+        triggered = ctx.triggered_id
+        if not isinstance(triggered, dict):
+            return no_update
+        remove_idx = triggered["index"]
+
+        p = state.portfolios[idx]
+        if remove_idx < len(p.assets) and len(p.assets) > 1:
+            p.assets.pop(remove_idx)
+            p.weights.pop(remove_idx)
+            total = sum(p.weights)
+            if total > 0:
+                p.weights = [w / total for w in p.weights]
+            else:
+                n = len(p.weights)
+                p.weights = [1.0 / n] * n
+            return (version or 0) + 1
+        return no_update
+
+    # ------------------------------------------------------------------ #
+    # Update Weights from Numeric Inputs
+    # ------------------------------------------------------------------ #
+
+    @callback(
+        Output("store-portfolios-version", "data", allow_duplicate=True),
+        Input({"type": "weight-input", "index": ALL}, "value"),
+        State("portfolio-selector", "value"),
+        State("store-portfolios-version", "data"),
+        prevent_initial_call=True,
+    )
+    def update_weights(weight_values, selected, version):
+        if selected is None or not weight_values:
+            return no_update
+        idx = int(selected)
+        if idx >= len(state.portfolios):
+            return no_update
+
+        p = state.portfolios[idx]
+        if len(weight_values) != len(p.weights):
+            return no_update
+
+        new_weights = []
+        for v in weight_values:
+            val = float(v) if v is not None else 0.0
+            new_weights.append(max(0.0, val) / 100.0)
+
+        total = sum(new_weights)
+        if total > 0:
+            new_weights = [w / total for w in new_weights]
+
+        if new_weights != p.weights:
+            p.weights = new_weights
             return (version or 0) + 1
         return no_update
 
@@ -319,7 +457,20 @@ def _register_callbacks(app: dash.Dash):
             return (version or 0) + 1, msg, True, "warning"
 
         n_analyzed = len(state.get_analyzed_pairs())
-        return (version or 0) + 1, f"Analysis complete — {n_analyzed} portfolios.", True, "success"
+        return (version or 0) + 1, f"Analysis complete \u2014 {n_analyzed} portfolios.", True, "success"
+
+    # ------------------------------------------------------------------ #
+    # Show/hide factor targets based on optimizer selection
+    # ------------------------------------------------------------------ #
+
+    @callback(
+        Output("factor-targets-container", "style"),
+        Input("optimizer-method", "value"),
+    )
+    def toggle_factor_targets(method):
+        if method == "factorbased":
+            return {"display": "block"}
+        return {"display": "none"}
 
     # ------------------------------------------------------------------ #
     # Run Optimizer
@@ -334,10 +485,15 @@ def _register_callbacks(app: dash.Dash):
         State("optimizer-method", "value"),
         State("optimizer-source-portfolio", "value"),
         State("input-rf", "value"),
+        State("factor-target-0", "value"),
+        State("factor-target-1", "value"),
+        State("factor-target-2", "value"),
+        State("factor-target-3", "value"),
+        State("factor-target-4", "value"),
         State("store-portfolios-version", "data"),
         prevent_initial_call=True,
     )
-    def run_optimization(n_clicks, method, source_idx, rf, version):
+    def run_optimization(n_clicks, method, source_idx, rf, ft0, ft1, ft2, ft3, ft4, version):
         if source_idx is None or not method:
             return no_update, "Select a source portfolio and method.", True, "warning"
 
@@ -351,7 +507,18 @@ def _register_callbacks(app: dash.Dash):
             return no_update, f'"{p.title}" has not been analyzed yet. Run analysis first.', True, "warning"
 
         try:
+            import numpy as np
             opts = OptimOptions(rf=rf or 0.045)
+
+            # Pass factor targets if using factor-based optimizer
+            if method == "factorbased":
+                raw = [ft0, ft1, ft2, ft3, ft4]
+                targets = np.array([
+                    float(v) if v is not None and v != "" else np.nan
+                    for v in raw
+                ])
+                opts.factor_targets = targets
+
             opt_port = run_optimizer(method, p, r, opts)
             opt_port.title = f"{p.title} ({method})"
             state.add_portfolio(opt_port)
@@ -381,11 +548,14 @@ def _register_callbacks(app: dash.Dash):
         Output("tab-summary", "children"),
         Output("graph-frontier", "figure"),
         Output("graph-forecast", "figure"),
-        Output("graph-distributions", "figure"),
+        Output("graph-dist-house", "figure"),
+        Output("graph-dist-retire", "figure"),
         Output("graph-factors", "figure"),
         Output("graph-drawdown", "figure"),
         Output("forecast-portfolio-select", "options"),
         Output("forecast-portfolio-select", "value"),
+        Output("drawdown-portfolio-select", "options"),
+        Output("drawdown-portfolio-select", "value"),
         Input("store-results-version", "data"),
     )
     def update_visualizations(_version):
@@ -394,12 +564,16 @@ def _register_callbacks(app: dash.Dash):
 
         if not pairs:
             return (
-                html.P("No analysis results yet. Add portfolios and click 'Run All'."),
+                html.P("No analysis results yet. Add portfolios and click 'Run All'.",
+                       style={"color": COLOR_TEXT_MUTED}),
                 empty_fig,
                 empty_fig,
                 empty_fig,
                 empty_fig,
                 empty_fig,
+                empty_fig,
+                [],
+                None,
                 [],
                 None,
             )
@@ -419,13 +593,15 @@ def _register_callbacks(app: dash.Dash):
 
         first_title = pairs[0][0] if pairs else None
         forecast = create_forecasted_returns(pairs, state.milestones, selected_title=first_title)
-        distributions = create_return_distributions(pairs, state.milestones)
+        dist_house = create_return_distribution_single(pairs, 0, state.milestones)
+        dist_retire = create_return_distribution_single(pairs, 1, state.milestones)
         factors = create_factor_exposures(pairs)
-        drawdown = create_historical_drawdown(pairs)
+        drawdown = create_historical_drawdown(pairs, selected_title=first_title)
 
-        forecast_options = [{"label": title, "value": title} for title, _ in pairs]
+        portfolio_options = [{"label": title, "value": title} for title, _ in pairs]
 
-        return summary, frontier, forecast, distributions, factors, drawdown, forecast_options, first_title
+        return (summary, frontier, forecast, dist_house, dist_retire, factors, drawdown,
+                portfolio_options, first_title, portfolio_options, first_title)
 
     @callback(
         Output("graph-forecast", "figure", allow_duplicate=True),
@@ -438,6 +614,18 @@ def _register_callbacks(app: dash.Dash):
         if not pairs:
             return no_update
         return create_forecasted_returns(pairs, state.milestones, selected_title=selected_title)
+
+    @callback(
+        Output("graph-drawdown", "figure", allow_duplicate=True),
+        Input("drawdown-portfolio-select", "value"),
+        State("store-results-version", "data"),
+        prevent_initial_call=True,
+    )
+    def update_drawdown_selection(selected_title, _version):
+        pairs = state.get_analyzed_pairs()
+        if not pairs:
+            return no_update
+        return create_historical_drawdown(pairs, selected_title=selected_title)
 
     # ------------------------------------------------------------------ #
     # Config save/load

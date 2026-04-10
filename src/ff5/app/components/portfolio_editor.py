@@ -5,13 +5,15 @@ from __future__ import annotations
 import dash_bootstrap_components as dbc
 from dash import html, dcc
 
+from ff5.app.theme import COLOR_PRIMARY, COLOR_TEXT_MUTED
+
 
 def create_portfolio_editor_layout() -> html.Div:
     """Create the sidebar portfolio editor layout."""
     return html.Div(
         [
             # Portfolio selector
-            html.H6("Portfolios", className="mb-2"),
+            html.H6("Portfolios", style={"color": COLOR_TEXT_MUTED, "marginBottom": "8px"}),
             dbc.Select(
                 id="portfolio-selector",
                 options=[],
@@ -55,7 +57,7 @@ def create_portfolio_editor_layout() -> html.Div:
                 className="mb-3",
             ),
             # Ticker management
-            html.H6("Assets", className="mb-2"),
+            html.H6("Assets", style={"color": COLOR_TEXT_MUTED, "marginBottom": "8px"}),
             dbc.InputGroup(
                 [
                     dbc.Input(
@@ -85,7 +87,7 @@ def create_portfolio_editor_layout() -> html.Div:
 
 
 def create_asset_weight_row(symbol: str, weight: float, index: int) -> dbc.Row:
-    """Create a single asset weight row with slider."""
+    """Create a single asset weight row with numeric input."""
     return dbc.Row(
         [
             dbc.Col(
@@ -93,33 +95,30 @@ def create_asset_weight_row(symbol: str, weight: float, index: int) -> dbc.Row:
                 width=3,
             ),
             dbc.Col(
-                dcc.Slider(
-                    id={"type": "weight-slider", "index": index},
+                dbc.Input(
+                    id={"type": "weight-input", "index": index},
+                    type="number",
                     min=0,
                     max=100,
                     step=0.1,
-                    value=weight * 100,
-                    marks=None,
-                    tooltip={"placement": "bottom", "always_visible": False},
+                    value=round(weight * 100, 2),
+                    size="sm",
+                    debounce=True,
                 ),
-                width=7,
+                width=6,
             ),
             dbc.Col(
                 [
-                    html.Span(
-                        f"{weight * 100:.1f}%",
-                        id={"type": "weight-display", "index": index},
-                        className="small",
-                    ),
+                    html.Span("%", className="small me-1"),
                     dbc.Button(
-                        "x",
+                        "\u00d7",
                         id={"type": "btn-remove-ticker", "index": index},
                         color="link",
                         size="sm",
                         className="p-0 ms-1 text-danger",
                     ),
                 ],
-                width=2,
+                width=3,
                 className="d-flex align-items-center",
             ),
         ],

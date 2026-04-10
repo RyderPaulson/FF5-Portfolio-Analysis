@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pandas as pd
-from dash import dash_table
+from dash import dash_table, dcc, html
 
 from ff5.models import AnalysisResults
 
@@ -47,14 +47,22 @@ def build_summary_dataframe(
 
 def create_summary_table(
     portfolios_results: list[tuple[str, AnalysisResults]],
-) -> dash_table.DataTable:
-    """Create a Dash DataTable with portfolio comparison metrics."""
+) -> html.Div:
+    """Create a summary table with a themed export button."""
+    from ff5.app.theme import BG_CARD, COLOR_BORDER, COLOR_TEXT, COLOR_TEXT_MUTED, FONT_FAMILY
+
     if not portfolios_results:
-        return dash_table.DataTable(id="summary-table")
+        return html.Div(
+            dash_table.DataTable(id="summary-table"),
+            id="summary-table-wrapper",
+        )
 
     df = build_summary_dataframe(portfolios_results)
 
-    return dash_table.DataTable(
+    # Build CSV string for download
+    csv_string = df.to_csv(index=False)
+
+    table = dash_table.DataTable(
         id="summary-table",
         columns=[{"name": col, "id": col} for col in df.columns],
         data=df.to_dict("records"),
@@ -62,22 +70,50 @@ def create_summary_table(
         style_cell={
             "textAlign": "right",
             "padding": "8px 12px",
-            "fontFamily": "system-ui, -apple-system, sans-serif",
+            "fontFamily": FONT_FAMILY,
             "fontSize": "13px",
+            "color": COLOR_TEXT,
+            "backgroundColor": BG_CARD,
+            "border": f"1px solid {COLOR_BORDER}",
         },
         style_cell_conditional=[
             {"if": {"column_id": "Portfolio"}, "textAlign": "left", "fontWeight": "bold"}
         ],
         style_header={
             "fontWeight": "bold",
-            "backgroundColor": "#f8f9fa",
-            "borderBottom": "2px solid #dee2e6",
+            "backgroundColor": "#E8E5D8",
+            "borderBottom": f"2px solid {COLOR_BORDER}",
         },
         style_data_conditional=[
             {
                 "if": {"row_index": "odd"},
-                "backgroundColor": "#f8f9fa",
+                "backgroundColor": "#F4F2EA",
             }
         ],
-        export_format="csv",
     )
+
+    export_button = html.A(
+        "Export CSV",
+        href="data:text/csv;charset=utf-8," + csv_string,
+        download="portfolio_summary.csv",
+        style={
+            "display": "inline-block",
+            "padding": "4px 14px",
+            "fontSize": "12px",
+            "fontFamily": FONT_FAMILY,
+            "color": COLOR_TEXT_MUTED,
+            "border": f"1px solid {COLOR_BORDER}",
+            "borderRadius": "8px",
+            "textDecoration": "none",
+            "cursor": "pointer",
+            "backgroundColor": "transparent",
+        },
+    )
+
+    return html.Div([
+        html.Div(
+            export_button,
+            style={"display": "flex", "justifyContent": "flex-end", "marginBottom": "8px"},
+        ),
+        table,
+    ])
