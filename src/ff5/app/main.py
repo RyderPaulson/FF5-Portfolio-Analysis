@@ -14,7 +14,10 @@ from ff5.app.components.portfolio_editor import (
     create_asset_weight_row,
     create_portfolio_editor_layout,
 )
-from ff5.app.components.summary_table import create_summary_table
+from ff5.app.components.summary_table import create_export_button, create_summary_table
+from ff5.app.components.tab_individual import create_individual_tab_content, register_individual_callbacks
+from ff5.app.components.tab_macro import create_macro_tab_content
+from ff5.app.components.tab_wiki import create_wiki_tab_content
 from ff5.app.figures.efficient_frontier import create_efficient_frontier
 from ff5.app.figures.factor_exposures import create_factor_exposures
 from ff5.app.figures.forecasted_returns import create_forecasted_returns
@@ -26,32 +29,16 @@ from ff5.app.theme import (
     BG_PAGE,
     BG_SIDEBAR,
     BENTO_CARD_STYLE,
-    BENTO_CARD_STYLE_COMPACT,
     COLOR_BORDER,
     COLOR_PRIMARY,
-    COLOR_PRIMARY_DARK,
     COLOR_TEXT,
     COLOR_TEXT_MUTED,
     FONT_FAMILY,
+    TAB_SELECTED_STYLE,
+    TAB_STYLE,
 )
 from ff5.models import Milestone, OptimOptions, PortfolioSpec
 from ff5.optimizers.dispatcher import run_optimizer
-
-
-# Shared graph config — smaller margins for bento cards
-_GRAPH_STYLE = {"height": "340px"}
-_GRAPH_CONFIG = {"displayModeBar": False}
-
-
-def _bento(children, **style_overrides):
-    """Wrap children in a bento card div."""
-    s = {**BENTO_CARD_STYLE, **style_overrides}
-    return html.Div(children, style=s)
-
-
-def _bento_compact(children, **style_overrides):
-    s = {**BENTO_CARD_STYLE_COMPACT, **style_overrides}
-    return html.Div(children, style=s)
 
 
 def create_app() -> dash.Dash:
@@ -67,6 +54,7 @@ def create_app() -> dash.Dash:
 
     app.layout = _create_layout()
     _register_callbacks(app)
+    register_individual_callbacks(app, state)
 
     return app
 
@@ -80,7 +68,7 @@ def _create_layout() -> html.Div:
             "color": COLOR_TEXT,
         },
         children=[
-            # ── Header bar ──────────────────────────────────────────────
+            # ── Header bar ──────────────────────────────────────────
             html.Div(
                 style={
                     "padding": "16px 24px",
@@ -113,21 +101,20 @@ def _create_layout() -> html.Div:
                 ],
             ),
 
-            # ── Bento grid ─────────────────────────────────────────────
+            # ── Two-column layout: sidebar + tabbed content ─────────
             html.Div(
                 style={
                     "display": "grid",
-                    "gridTemplateColumns": "280px 1fr 1fr",
+                    "gridTemplateColumns": "280px 1fr",
                     "gap": "12px",
                     "padding": "0 24px 24px 24px",
                 },
                 children=[
-                    # ── Sidebar: portfolio editor (flows with page) ─────
+                    # ── Sidebar ──────────────────────────────────────
                     html.Div(
                         style={
                             **BENTO_CARD_STYLE,
                             "backgroundColor": BG_SIDEBAR,
-                            "gridRow": "1 / 6",
                         },
                         children=[
                             create_portfolio_editor_layout(),
@@ -136,79 +123,36 @@ def _create_layout() -> html.Div:
                         ],
                     ),
 
-                    # ── Row 1: Summary table ────────────────────────────
+                    # ── Tabbed main content ──────────────────────────
                     html.Div(
-                        style={
-                            **BENTO_CARD_STYLE,
-                            "gridColumn": "2 / 4",
-                        },
                         children=[
-                            html.H6("Summary", style={"marginBottom": "12px", "color": COLOR_TEXT_MUTED}),
-                            html.Div(id="tab-summary"),
-                        ],
-                    ),
-
-                    # ── Row 2: Efficient Frontier + Forecasted Returns ──
-                    _bento_compact(
-                        [
-                            html.H6("Efficient Frontier", style={"marginBottom": "8px", "color": COLOR_TEXT_MUTED}),
-                            dcc.Graph(id="graph-frontier", style=_GRAPH_STYLE, config=_GRAPH_CONFIG),
-                        ],
-                    ),
-                    _bento_compact(
-                        [
-                            html.Div(
-                                style={"display": "flex", "justifyContent": "space-between", "alignItems": "center", "marginBottom": "8px"},
+                            dcc.Tabs(
+                                id="main-tabs",
+                                value="macro",
                                 children=[
-                                    html.H6("Forecasted Returns", style={"margin": 0, "color": COLOR_TEXT_MUTED}),
-                                    dbc.Select(
-                                        id="forecast-portfolio-select",
-                                        options=[],
-                                        value=None,
-                                        style={"maxWidth": "160px", "fontSize": "12px", "padding": "2px 8px"},
+                                    dcc.Tab(
+                                        label="Macro Analysis",
+                                        value="macro",
+                                        style=TAB_STYLE,
+                                        selected_style=TAB_SELECTED_STYLE,
+                                        children=create_macro_tab_content(),
+                                    ),
+                                    dcc.Tab(
+                                        label="Individual Portfolio",
+                                        value="individual",
+                                        style=TAB_STYLE,
+                                        selected_style=TAB_SELECTED_STYLE,
+                                        children=create_individual_tab_content(),
+                                    ),
+                                    dcc.Tab(
+                                        label="Methodology",
+                                        value="wiki",
+                                        style=TAB_STYLE,
+                                        selected_style=TAB_SELECTED_STYLE,
+                                        children=create_wiki_tab_content(),
                                     ),
                                 ],
                             ),
-                            dcc.Graph(id="graph-forecast", style=_GRAPH_STYLE, config=_GRAPH_CONFIG),
-                        ],
-                    ),
-
-                    # ── Row 3: House Distribution + Retire Distribution ─
-                    _bento_compact(
-                        [
-                            html.H6("House Distribution", style={"marginBottom": "8px", "color": COLOR_TEXT_MUTED}),
-                            dcc.Graph(id="graph-dist-house", style=_GRAPH_STYLE, config=_GRAPH_CONFIG),
-                        ],
-                    ),
-                    _bento_compact(
-                        [
-                            html.H6("Retirement Distribution", style={"marginBottom": "8px", "color": COLOR_TEXT_MUTED}),
-                            dcc.Graph(id="graph-dist-retire", style=_GRAPH_STYLE, config=_GRAPH_CONFIG),
-                        ],
-                    ),
-
-                    # ── Row 4: Drawdown + Factor Exposures ──────────────
-                    _bento_compact(
-                        [
-                            html.Div(
-                                style={"display": "flex", "justifyContent": "space-between", "alignItems": "center", "marginBottom": "8px"},
-                                children=[
-                                    html.H6("Historical Drawdown", style={"margin": 0, "color": COLOR_TEXT_MUTED}),
-                                    dbc.Select(
-                                        id="drawdown-portfolio-select",
-                                        options=[],
-                                        value=None,
-                                        style={"maxWidth": "160px", "fontSize": "12px", "padding": "2px 8px"},
-                                    ),
-                                ],
-                            ),
-                            dcc.Graph(id="graph-drawdown", style=_GRAPH_STYLE, config=_GRAPH_CONFIG),
-                        ],
-                    ),
-                    _bento_compact(
-                        [
-                            html.H6("Factor Exposures", style={"marginBottom": "8px", "color": COLOR_TEXT_MUTED}),
-                            dcc.Graph(id="graph-factors", style=_GRAPH_STYLE, config=_GRAPH_CONFIG),
                         ],
                     ),
                 ],
@@ -460,7 +404,7 @@ def _register_callbacks(app: dash.Dash):
         return (version or 0) + 1, f"Analysis complete \u2014 {n_analyzed} portfolios.", True, "success"
 
     # ------------------------------------------------------------------ #
-    # Show/hide factor targets based on optimizer selection
+    # Show/hide factor targets
     # ------------------------------------------------------------------ #
 
     @callback(
@@ -510,7 +454,6 @@ def _register_callbacks(app: dash.Dash):
             import numpy as np
             opts = OptimOptions(rf=rf or 0.045)
 
-            # Pass factor targets if using factor-based optimizer
             if method == "factorbased":
                 raw = [ft0, ft1, ft2, ft3, ft4]
                 targets = np.array([
@@ -541,11 +484,12 @@ def _register_callbacks(app: dash.Dash):
         ]
 
     # ------------------------------------------------------------------ #
-    # Update Visualizations
+    # Update Macro Visualizations
     # ------------------------------------------------------------------ #
 
     @callback(
         Output("tab-summary", "children"),
+        Output("summary-export-container", "children"),
         Output("graph-frontier", "figure"),
         Output("graph-forecast", "figure"),
         Output("graph-dist-house", "figure"),
@@ -566,6 +510,7 @@ def _register_callbacks(app: dash.Dash):
             return (
                 html.P("No analysis results yet. Add portfolios and click 'Run All'.",
                        style={"color": COLOR_TEXT_MUTED}),
+                html.Span(),
                 empty_fig,
                 empty_fig,
                 empty_fig,
@@ -581,6 +526,7 @@ def _register_callbacks(app: dash.Dash):
         results_map = {title: r for title, r in pairs}
 
         summary = create_summary_table(pairs)
+        export_btn = create_export_button(pairs)
 
         try:
             frontier = create_efficient_frontier(
@@ -600,7 +546,7 @@ def _register_callbacks(app: dash.Dash):
 
         portfolio_options = [{"label": title, "value": title} for title, _ in pairs]
 
-        return (summary, frontier, forecast, dist_house, dist_retire, factors, drawdown,
+        return (summary, export_btn, frontier, forecast, dist_house, dist_retire, factors, drawdown,
                 portfolio_options, first_title, portfolio_options, first_title)
 
     @callback(

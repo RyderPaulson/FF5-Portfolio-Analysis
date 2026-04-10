@@ -25,7 +25,6 @@ portfolios:
     weights: [0.9, 0.02, 0.02, 0.02, 0.02, 0.02]
     rebalance_cost: 0.06
 
-
   - title: AVGE
     assets: [AVGE]
     weights: [1.0]

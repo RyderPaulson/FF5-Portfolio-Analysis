@@ -58,6 +58,35 @@ BENTO_CARD_STYLE_COMPACT = {
 }
 
 
+# Tab navigation styles
+TAB_STYLE = {
+    "padding": "10px 24px",
+    "fontFamily": FONT_FAMILY,
+    "fontSize": "14px",
+    "fontWeight": "500",
+    "color": COLOR_TEXT_MUTED,
+    "backgroundColor": BG_PAGE,
+    "border": "none",
+    "borderBottom": f"2px solid {COLOR_BORDER}",
+    "cursor": "pointer",
+}
+
+TAB_SELECTED_STYLE = {
+    **TAB_STYLE,
+    "color": COLOR_TEXT,
+    "borderBottom": f"2px solid {COLOR_PRIMARY}",
+    "backgroundColor": BG_CARD,
+    "borderRadius": "8px 8px 0 0",
+}
+
+# Wiki section card (wider padding for readable prose)
+BENTO_CARD_WIKI = {
+    **BENTO_CARD_STYLE,
+    "padding": "28px 32px",
+    "height": "auto",
+}
+
+
 def get_color(index: int) -> str:
     """Get a portfolio color by index, cycling if needed."""
     return PORTFOLIO_COLORS[index % len(PORTFOLIO_COLORS)]
