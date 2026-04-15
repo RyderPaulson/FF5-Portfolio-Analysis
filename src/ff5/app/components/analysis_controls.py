@@ -120,13 +120,25 @@ def create_settings_panel() -> html.Div:
             ),
             html.Hr(style={"borderColor": COLOR_TEXT_MUTED, "opacity": "0.3"}),
             html.Div(
-                style={"display": "flex", "gap": "8px"},
+                style={"display": "flex", "gap": "8px", "marginBottom": "8px"},
                 children=[
                     html.Button("Save Config", id="btn-save-config",
                                 style={**_BTN_OUTLINE_STYLE, "flex": "1", "padding": "4px 8px", "fontSize": "13px"}),
                     html.Button("Load Config", id="btn-load-config",
                                 style={**_BTN_OUTLINE_STYLE, "flex": "1", "padding": "4px 8px", "fontSize": "13px"}),
                 ],
+            ),
+            html.Hr(style={"borderColor": COLOR_TEXT_MUTED, "opacity": "0.3"}),
+            html.H6("Brokerage", style={"color": COLOR_TEXT_MUTED, "marginBottom": "8px"}),
+            html.Button(
+                "Load from Brokerage",
+                id="btn-load-brokerage",
+                style={**_BTN_OUTLINE_STYLE, "width": "100%", "padding": "4px 8px", "fontSize": "13px"},
+                className="mb-1",
+            ),
+            html.Small(
+                id="brokerage-status",
+                style={"color": COLOR_TEXT_MUTED, "display": "block"},
             ),
         ]
     )

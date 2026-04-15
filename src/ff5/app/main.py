@@ -603,6 +603,88 @@ def _register_callbacks(app: dash.Dash):
         n = len(state.portfolios)
         return (version or 0) + 1, f"Loaded {n} portfolios from config.", True, "info"
 
+    # ------------------------------------------------------------------ #
+    # Brokerage integration (SnapTrade)
+    # ------------------------------------------------------------------ #
+
+    @callback(
+        Output("store-portfolios-version", "data", allow_duplicate=True),
+        Output("brokerage-status", "children"),
+        Output("status-alert", "children", allow_duplicate=True),
+        Output("status-alert", "is_open", allow_duplicate=True),
+        Output("status-alert", "color", allow_duplicate=True),
+        Output("rebal-total-value", "value"),
+        Input("btn-load-brokerage", "n_clicks"),
+        State("store-portfolios-version", "data"),
+        prevent_initial_call=True,
+    )
+    def load_from_brokerage(_n, version):
+        from ff5.data.snaptrade_client import (
+            fetch_holdings,
+            holdings_to_portfolio,
+            is_configured,
+            is_connected,
+            register_and_connect,
+        )
+
+        if not is_configured():
+            return (
+                no_update,
+                "Add SNAPTRADE_CLIENT_ID and SNAPTRADE_CONSUMER_KEY to .env",
+                "SnapTrade credentials not configured. See .env.example.",
+                True,
+                "warning",
+                no_update,
+            )
+
+        if not is_connected():
+            try:
+                url = register_and_connect()
+                return (
+                    no_update,
+                    html.A("Open connection portal", href=url, target="_blank",
+                           style={"color": COLOR_PRIMARY, "fontSize": "12px"}),
+                    "Open the connection portal link in the sidebar to link your brokerage, then click Load again.",
+                    True,
+                    "info",
+                    no_update,
+                )
+            except Exception as e:
+                return no_update, str(e), f"SnapTrade error: {e}", True, "danger", no_update
+
+        # Already connected — fetch holdings
+        try:
+            holdings = fetch_holdings()
+            if not holdings:
+                return no_update, "No holdings found.", "No holdings found in linked accounts.", True, "warning", no_update
+
+            symbols, weights, total_value = holdings_to_portfolio(holdings)
+
+            # Find or create the "Current" portfolio
+            current_idx = None
+            for i, p in enumerate(state.portfolios):
+                if p.title == "Current":
+                    current_idx = i
+                    break
+
+            new_port = PortfolioSpec(
+                assets=symbols,
+                weights=weights,
+                title="Current",
+            )
+
+            if current_idx is not None:
+                state.portfolios[current_idx] = new_port
+            else:
+                state.portfolios.insert(0, new_port)
+
+            n_holdings = len(symbols)
+            msg = f"Loaded {n_holdings} holdings (${total_value:,.0f}) into 'Current' portfolio."
+            return (version or 0) + 1, f"Connected \u2014 {n_holdings} holdings", msg, True, "success", round(total_value, 2)
+
+        except Exception as e:
+            return no_update, f"Error: {e}", f"Failed to fetch holdings: {e}", True, "danger", no_update
+
 
 def main():
     """Entry point for the application."""

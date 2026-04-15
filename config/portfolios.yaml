@@ -11,10 +11,6 @@ milestone_targets:
   - 10.0
 
 portfolios:
-  - title: Current
-    assets: [MSFT, DE, BP, BRK.B, VOO, QQQ, VXUS]
-    weights: [0.1568, 0.1481, 0.1012, 0.06539, 0.1341, 0.04011, 0.0801]
-
   - title: VANGUARD
     assets: [VTI, VOO, VB, VXUS, VEA, VWO, VTV, VBR]
     weights: [0.125, 0.125, 0.125, 0.125, 0.125, 0.125, 0.125, 0.125]

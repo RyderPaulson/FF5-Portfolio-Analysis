@@ -18,6 +18,7 @@ dependencies = [
     "python-dotenv>=1.0",
     "diskcache>=5.6",
     "yfinance>=0.2.36",
+    "snaptrade-python-sdk>=11.0",
 ]
 
 [project.optional-dependencies]
